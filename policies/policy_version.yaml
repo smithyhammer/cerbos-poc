@@ -1,0 +1,10 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  # Governs who may switch the active policy version. The API always checks this
+  # at the default version, so a proposed version can never lock admins out.
+  resource: policy_version
+  version: default
+  rules:
+    - actions: ["activate"]
+      effect: EFFECT_ALLOW
+      roles: ["admin"]

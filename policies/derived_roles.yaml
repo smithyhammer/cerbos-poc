@@ -1,0 +1,17 @@
+apiVersion: api.cerbos.dev/v1
+derivedRoles:
+  name: expense_derived_roles
+  definitions:
+    # The principal owns the resource
+    - name: owner
+      parentRoles: ["employee", "manager"]
+      condition:
+        match:
+          expr: request.resource.attr.ownerId == request.principal.id
+
+    # A manager in the same department as the resource
+    - name: department_manager
+      parentRoles: ["manager"]
+      condition:
+        match:
+          expr: request.resource.attr.department == request.principal.attr.department

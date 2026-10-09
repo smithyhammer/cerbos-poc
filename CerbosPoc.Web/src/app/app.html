@@ -1,0 +1,66 @@
+<header class="flex items-center gap-6 bg-gray-800 px-6 py-3 text-gray-50">
+  <a class="text-lg font-bold" routerLink="/">Cerbos POC</a>
+
+  <nav class="flex flex-1 gap-1">
+    @for (item of nav; track item.section) {
+      @if (session.canSee(item.section)) {
+        <a [routerLink]="'/' + item.section" routerLinkActive #rla="routerLinkActive"
+           class="rounded-md px-3 py-1.5" [class.bg-gray-700]="rla.isActive"
+           [class]="!session.isAllowed(item.section) ? 'border border-dashed border-red-400 text-red-300'
+                    : rla.isActive ? 'text-white' : 'text-gray-300 hover:text-white'"
+           [title]="session.isAllowed(item.section) ? '' : 'Hidden by Cerbos policy - shown because hidden UI is revealed'">
+          {{ item.label }}
+        </a>
+      }
+    }
+  </nav>
+
+  @if (session.me(); as me) {
+    @if (me.canChangePolicyVersion || session.revealHidden()) {
+      <label class="flex items-center gap-1.5 text-sm"
+             [title]="me.canChangePolicyVersion ? 'Switch the Cerbos policy version for everyone' : 'Hidden by Cerbos policy - shown because hidden UI is revealed'">
+        Policy
+        <select class="rounded-md border px-2 py-1"
+                [class]="me.canChangePolicyVersion ? 'border-amber-400 bg-gray-700 text-amber-200' : 'border-dashed border-red-400 bg-gray-800 text-red-300'"
+                (change)="session.activatePolicyVersion($any($event.target).value)">
+          @for (v of session.policyVersions(); track v.id) {
+            <option [value]="v.id" [selected]="v.id === me.policyVersion">{{ v.label }} ({{ v.id }})</option>
+          }
+        </select>
+      </label>
+    } @else {
+      <span class="rounded-full border border-gray-600 px-2.5 py-0.5 text-xs text-gray-300" title="Cerbos policy version in force">
+        Policy: {{ session.activePolicyVersion()?.label ?? me.policyVersion }} ({{ me.policyVersion }})
+      </span>
+    }
+  }
+
+  <label class="flex items-center gap-1.5 text-sm">
+    <input type="checkbox" class="accent-blue-500" [checked]="session.revealHidden()" (change)="session.revealHidden.set($any($event.target).checked)" />
+    Reveal hidden UI
+  </label>
+
+  <label class="flex items-center gap-1.5 text-sm">
+    Signed in as
+    <select class="rounded-md border border-gray-600 bg-gray-700 px-2 py-1 text-gray-50"
+            [value]="session.currentUser.id()" (change)="switchUser($any($event.target).value)">
+      @for (u of session.users(); track u.id) {
+        <option [value]="u.id" [selected]="u.id === session.currentUser.id()">
+          {{ u.id }} ({{ u.role }}{{ u.department ? ', ' + u.department : '' }})
+        </option>
+      }
+    </select>
+  </label>
+</header>
+
+@if (notifier.message(); as m) {
+  <div class="mx-6 mt-4 cursor-pointer rounded-md px-4 py-3"
+       [class]="m.kind === 'error' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-900'"
+       (click)="notifier.message.set(null)">
+    {{ m.text }} <span class="float-right font-bold">&times;</span>
+  </div>
+}
+
+<main class="max-w-[1100px] p-6">
+  <router-outlet />
+</main>

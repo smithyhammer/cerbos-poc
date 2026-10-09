@@ -1,0 +1,11 @@
+apiVersion: api.cerbos.dev/v1
+principalPolicy:
+  # Principal policies are versioned like resource policies: without this copy,
+  # Bob's restriction would silently disappear whenever v2 is active.
+  principal: bob
+  version: v2
+  rules:
+    - resource: expense
+      actions:
+        - action: "create"
+          effect: EFFECT_DENY

@@ -1,0 +1,74 @@
+name: AppSectionPolicyTests
+description: Unit tests for the app_section resource policy that drives UI section visibility
+principals:
+  alice_admin:
+    id: alice
+    roles: ["admin"]
+  bob_employee:
+    id: bob
+    roles: ["employee"]
+    attr:
+      department: ENG
+  carol_manager:
+    id: carol
+    roles: ["manager"]
+    attr:
+      department: ENG
+
+resources:
+  expenses:
+    kind: app_section
+    id: expenses
+  approvals:
+    kind: app_section
+    id: approvals
+  reports:
+    kind: app_section
+    id: reports
+  admin:
+    kind: app_section
+    id: admin
+
+tests:
+  - name: Section visibility by role
+    input:
+      principals: ["alice_admin", "bob_employee", "carol_manager"]
+      resources: ["expenses", "approvals", "reports", "admin"]
+      actions: ["view"]
+    expected:
+      - principal: alice_admin
+        resource: expenses
+        actions: { view: EFFECT_ALLOW }
+      - principal: alice_admin
+        resource: approvals
+        actions: { view: EFFECT_ALLOW }
+      - principal: alice_admin
+        resource: reports
+        actions: { view: EFFECT_ALLOW }
+      - principal: alice_admin
+        resource: admin
+        actions: { view: EFFECT_ALLOW }
+      - principal: bob_employee
+        resource: expenses
+        actions: { view: EFFECT_ALLOW }
+      - principal: bob_employee
+        resource: approvals
+        actions: { view: EFFECT_DENY }
+      - principal: bob_employee
+        resource: reports
+        actions: { view: EFFECT_DENY }
+      - principal: bob_employee
+        resource: admin
+        actions: { view: EFFECT_DENY }
+      - principal: carol_manager
+        resource: expenses
+        actions: { view: EFFECT_ALLOW }
+      - principal: carol_manager
+        resource: approvals
+        actions: { view: EFFECT_ALLOW }
+      - principal: carol_manager
+        resource: reports
+        actions: { view: EFFECT_ALLOW }
+      - principal: carol_manager
+        resource: admin
+        actions: { view: EFFECT_DENY }

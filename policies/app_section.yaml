@@ -1,0 +1,25 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: app_section
+  version: default
+  rules:
+    # Admins see every section of the application
+    - actions: ["*"]
+      effect: EFFECT_ALLOW
+      roles: ["admin"]
+
+    # Everyone with a job role gets the expenses section
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["employee", "manager"]
+      condition:
+        match:
+          expr: request.resource.id == "expenses"
+
+    # Managers additionally get the approvals queue and department reports
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["manager"]
+      condition:
+        match:
+          expr: request.resource.id in ["approvals", "reports"]

@@ -1,0 +1,73 @@
+name: AppSectionPolicyV2Tests
+description: Unit tests for the proposed v2 app_section policy (fixtures request policyVersion v2)
+principals:
+  alice_admin:
+    id: alice
+    roles: ["admin"]
+    policyVersion: v2
+  bob_employee:
+    id: bob
+    roles: ["employee"]
+    policyVersion: v2
+    attr:
+      department: ENG
+  carol_manager:
+    id: carol
+    roles: ["manager"]
+    policyVersion: v2
+    attr:
+      department: ENG
+
+resources:
+  expenses:
+    kind: app_section
+    id: expenses
+    policyVersion: v2
+  approvals:
+    kind: app_section
+    id: approvals
+    policyVersion: v2
+  reports:
+    kind: app_section
+    id: reports
+    policyVersion: v2
+  admin:
+    kind: app_section
+    id: admin
+    policyVersion: v2
+
+tests:
+  - name: Section visibility by role in v2
+    input:
+      principals: ["alice_admin", "bob_employee", "carol_manager"]
+      resources: ["expenses", "approvals", "reports", "admin"]
+      actions: ["view"]
+    expected:
+      - principal: alice_admin
+        resource: expenses
+        actions: { view: EFFECT_ALLOW }
+      - principal: alice_admin
+        resource: approvals
+        actions: { view: EFFECT_ALLOW }
+      - principal: alice_admin
+        resource: reports
+        actions: { view: EFFECT_ALLOW }
+      - principal: alice_admin
+        resource: admin
+        actions: { view: EFFECT_ALLOW }
+      - principal: bob_employee
+        resource: expenses
+        actions: { view: EFFECT_ALLOW }
+      # CHANGED in v2: employees get Reports
+      - principal: bob_employee
+        resource: reports
+        actions: { view: EFFECT_ALLOW }
+      - principal: carol_manager
+        resource: expenses
+        actions: { view: EFFECT_ALLOW }
+      - principal: carol_manager
+        resource: approvals
+        actions: { view: EFFECT_ALLOW }
+      - principal: carol_manager
+        resource: reports
+        actions: { view: EFFECT_ALLOW }

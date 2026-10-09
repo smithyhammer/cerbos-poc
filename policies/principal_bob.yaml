@@ -1,0 +1,12 @@
+apiVersion: api.cerbos.dev/v1
+principalPolicy:
+  principal: bob
+  version: default
+  rules:
+    # Bob specifically may not raise new expenses. Principal policies take
+    # precedence over resource policies, so this overrides the expense
+    # policy's "any employee or manager can create" rule for Bob only.
+    - resource: expense
+      actions:
+        - action: "create"
+          effect: EFFECT_DENY

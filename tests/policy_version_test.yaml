@@ -1,0 +1,32 @@
+name: PolicyVersionPolicyTests
+description: Only admins may switch the active policy version
+principals:
+  alice_admin:
+    id: alice
+    roles: ["admin"]
+  bob_employee:
+    id: bob
+    roles: ["employee"]
+    attr:
+      department: ENG
+  carol_manager:
+    id: carol
+    roles: ["manager"]
+    attr:
+      department: ENG
+
+resources:
+  v2:
+    kind: policy_version
+    id: v2
+
+tests:
+  - name: Only admins can activate a policy version
+    input:
+      principals: ["alice_admin", "bob_employee", "carol_manager"]
+      resources: ["v2"]
+      actions: ["activate"]
+    expected:
+      - principal: alice_admin
+        resource: v2
+        actions: { activate: EFFECT_ALLOW }

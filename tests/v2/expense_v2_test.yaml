@@ -1,0 +1,159 @@
+name: ExpensePolicyV2Tests
+description: Unit tests for the proposed v2 expense policy (fixtures request policyVersion v2)
+principals:
+  alice_admin:
+    id: alice
+    roles: ["admin"]
+    policyVersion: v2
+  bob_employee:
+    id: bob
+    roles: ["employee"]
+    policyVersion: v2
+    attr:
+      department: ENG
+  carol_manager:
+    id: carol
+    roles: ["manager"]
+    policyVersion: v2
+    attr:
+      department: ENG
+  dave_other_dept:
+    id: dave
+    roles: ["employee"]
+    policyVersion: v2
+    attr:
+      department: SALES
+  eve_sales_manager:
+    id: eve
+    roles: ["manager"]
+    policyVersion: v2
+    attr:
+      department: SALES
+
+resources:
+  bobs_draft:
+    kind: expense
+    id: exp-001
+    policyVersion: v2
+    attr:
+      ownerId: bob
+      department: ENG
+      amount: 9000
+      status: DRAFT
+  bobs_submitted:
+    kind: expense
+    id: exp-002
+    policyVersion: v2
+    attr:
+      ownerId: bob
+      department: ENG
+      amount: 9000
+      status: SUBMITTED
+  daves_submitted:
+    kind: expense
+    id: exp-006
+    policyVersion: v2
+    attr:
+      ownerId: dave
+      department: SALES
+      amount: 1200
+      status: SUBMITTED
+  daves_approved:
+    kind: expense
+    id: exp-008
+    policyVersion: v2
+    attr:
+      ownerId: dave
+      department: SALES
+      amount: 1200
+      status: APPROVED
+  eng_boundary_submitted:
+    kind: expense
+    id: exp-009
+    policyVersion: v2
+    attr:
+      ownerId: frank
+      department: ENG
+      amount: 5000
+      status: SUBMITTED
+  eng_over_boundary_submitted:
+    kind: expense
+    id: exp-010
+    policyVersion: v2
+    attr:
+      ownerId: frank
+      department: ENG
+      amount: 5001
+      status: SUBMITTED
+
+tests:
+  - name: Admin can still do everything
+    input:
+      principals: ["alice_admin"]
+      resources: ["bobs_submitted"]
+      actions: ["view", "create", "approve", "delete"]
+    expected:
+      - principal: alice_admin
+        resource: bobs_submitted
+        actions:
+          view: EFFECT_ALLOW
+          create: EFFECT_ALLOW
+          approve: EFFECT_ALLOW
+          delete: EFFECT_ALLOW
+
+  - name: Approval limit lowered to 5000
+    input:
+      principals: ["carol_manager"]
+      resources: ["bobs_submitted", "eng_boundary_submitted", "eng_over_boundary_submitted"]
+      actions: ["approve"]
+    expected:
+      - principal: carol_manager
+        resource: bobs_submitted
+        actions: { approve: EFFECT_DENY }
+      - principal: carol_manager
+        resource: eng_boundary_submitted
+        actions: { approve: EFFECT_ALLOW }
+      - principal: carol_manager
+        resource: eng_over_boundary_submitted
+        actions: { approve: EFFECT_DENY }
+
+  - name: Small expenses remain approvable in the manager's department only
+    input:
+      principals: ["eve_sales_manager", "carol_manager"]
+      resources: ["daves_submitted"]
+      actions: ["view", "approve"]
+    expected:
+      - principal: eve_sales_manager
+        resource: daves_submitted
+        actions:
+          view: EFFECT_ALLOW
+          approve: EFFECT_ALLOW
+
+  - name: Owners can withdraw submitted expenses but not approved ones
+    input:
+      principals: ["dave_other_dept", "bob_employee"]
+      resources: ["daves_submitted", "daves_approved", "bobs_draft", "bobs_submitted"]
+      actions: ["delete"]
+    expected:
+      - principal: dave_other_dept
+        resource: daves_submitted
+        actions: { delete: EFFECT_ALLOW }
+      - principal: bob_employee
+        resource: bobs_draft
+        actions: { delete: EFFECT_ALLOW }
+      - principal: bob_employee
+        resource: bobs_submitted
+        actions: { delete: EFFECT_ALLOW }
+
+  - name: Bob's create restriction carries over to v2
+    input:
+      principals: ["bob_employee", "dave_other_dept"]
+      resources: ["bobs_draft"]
+      actions: ["create"]
+    expected:
+      - principal: bob_employee
+        resource: bobs_draft
+        actions: { create: EFFECT_DENY }
+      - principal: dave_other_dept
+        resource: bobs_draft
+        actions: { create: EFFECT_ALLOW }

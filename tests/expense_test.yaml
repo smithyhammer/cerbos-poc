@@ -1,0 +1,260 @@
+name: ExpensePolicyTests
+description: Unit tests for the expense resource policy
+principals:
+  alice_admin:
+    id: alice
+    roles: ["admin"]
+  bob_employee:
+    id: bob
+    roles: ["employee"]
+    attr:
+      department: ENG
+  carol_manager:
+    id: carol
+    roles: ["manager"]
+    attr:
+      department: ENG
+  dave_other_dept:
+    id: dave
+    roles: ["employee"]
+    attr:
+      department: SALES
+  eve_sales_manager:
+    id: eve
+    roles: ["manager"]
+    attr:
+      department: SALES
+
+resources:
+  bobs_draft:
+    kind: expense
+    id: exp-001
+    attr:
+      ownerId: bob
+      department: ENG
+      amount: 9000
+      status: DRAFT
+  bobs_submitted:
+    kind: expense
+    id: exp-002
+    attr:
+      ownerId: bob
+      department: ENG
+      amount: 9000
+      status: SUBMITTED
+  carols_big_submitted:
+    kind: expense
+    id: exp-003
+    attr:
+      ownerId: carol
+      department: ENG
+      amount: 15000
+      status: SUBMITTED
+  carols_draft:
+    kind: expense
+    id: exp-004
+    attr:
+      ownerId: carol
+      department: ENG
+      amount: 500
+      status: DRAFT
+  franks_boundary_submitted:
+    kind: expense
+    id: exp-005
+    attr:
+      ownerId: frank
+      department: ENG
+      amount: 10000
+      status: SUBMITTED
+  bobs_big_submitted:
+    kind: expense
+    id: exp-006
+    attr:
+      ownerId: bob
+      department: ENG
+      amount: 10001
+      status: SUBMITTED
+
+tests:
+  - name: Admin can do everything
+    input:
+      principals: ["alice_admin"]
+      resources: ["bobs_draft", "carols_big_submitted"]
+      actions: ["view", "create", "approve", "delete"]
+    expected:
+      - principal: alice_admin
+        resource: bobs_draft
+        actions:
+          view: EFFECT_ALLOW
+          create: EFFECT_ALLOW
+          approve: EFFECT_ALLOW
+          delete: EFFECT_ALLOW
+      - principal: alice_admin
+        resource: carols_big_submitted
+        actions:
+          view: EFFECT_ALLOW
+          create: EFFECT_ALLOW
+          approve: EFFECT_ALLOW
+          delete: EFFECT_ALLOW
+
+  - name: Owner rights on own draft
+    input:
+      principals: ["bob_employee"]
+      resources: ["bobs_draft"]
+      actions: ["view", "create", "approve", "delete"]
+    expected:
+      - principal: bob_employee
+        resource: bobs_draft
+        actions:
+          view: EFFECT_ALLOW
+          create: EFFECT_DENY
+          approve: EFFECT_DENY
+          delete: EFFECT_ALLOW
+
+  - name: Bob's principal policy blocks create for Bob only
+    input:
+      principals: ["bob_employee", "dave_other_dept", "carol_manager"]
+      resources: ["bobs_draft"]
+      actions: ["create"]
+    expected:
+      - principal: bob_employee
+        resource: bobs_draft
+        actions:
+          create: EFFECT_DENY
+      - principal: dave_other_dept
+        resource: bobs_draft
+        actions:
+          create: EFFECT_ALLOW
+      - principal: carol_manager
+        resource: bobs_draft
+        actions:
+          create: EFFECT_ALLOW
+
+  - name: Owner cannot delete once submitted
+    input:
+      principals: ["bob_employee"]
+      resources: ["bobs_submitted"]
+      actions: ["view", "delete"]
+    expected:
+      - principal: bob_employee
+        resource: bobs_submitted
+        actions:
+          view: EFFECT_ALLOW
+          delete: EFFECT_DENY
+
+  - name: Manager can approve submitted expense in own department
+    input:
+      principals: ["carol_manager"]
+      resources: ["bobs_submitted"]
+      actions: ["view", "approve"]
+    expected:
+      - principal: carol_manager
+        resource: bobs_submitted
+        actions:
+          view: EFFECT_ALLOW
+          approve: EFFECT_ALLOW
+
+  - name: Manager cannot approve own or over-limit expense
+    input:
+      principals: ["carol_manager"]
+      resources: ["carols_big_submitted"]
+      actions: ["view", "approve", "delete"]
+    expected:
+      - principal: carol_manager
+        resource: carols_big_submitted
+        actions:
+          view: EFFECT_ALLOW
+          approve: EFFECT_DENY
+          delete: EFFECT_DENY
+
+  - name: Employee from another department can create but sees nothing
+    input:
+      principals: ["dave_other_dept"]
+      resources: ["bobs_submitted"]
+      actions: ["view", "create", "approve", "delete"]
+    expected:
+      - principal: dave_other_dept
+        resource: bobs_submitted
+        actions:
+          view: EFFECT_DENY
+          create: EFFECT_ALLOW
+          approve: EFFECT_DENY
+          delete: EFFECT_DENY
+
+  - name: Manager cannot approve a DRAFT expense
+    input:
+      principals: ["carol_manager"]
+      resources: ["bobs_draft"]
+      actions: ["view", "approve", "delete"]
+    expected:
+      - principal: carol_manager
+        resource: bobs_draft
+        actions:
+          view: EFFECT_ALLOW
+          approve: EFFECT_DENY
+          delete: EFFECT_DENY
+
+  - name: Approval limit boundary - exactly 10000 is allowed
+    input:
+      principals: ["carol_manager"]
+      resources: ["franks_boundary_submitted"]
+      actions: ["approve"]
+    expected:
+      - principal: carol_manager
+        resource: franks_boundary_submitted
+        actions:
+          approve: EFFECT_ALLOW
+
+  - name: Approval limit boundary - 10001 is denied even when not owner
+    input:
+      principals: ["carol_manager"]
+      resources: ["bobs_big_submitted"]
+      actions: ["view", "approve"]
+    expected:
+      - principal: carol_manager
+        resource: bobs_big_submitted
+        actions:
+          view: EFFECT_ALLOW
+          approve: EFFECT_DENY
+
+  - name: Manager from another department has no view or approve rights
+    input:
+      principals: ["eve_sales_manager"]
+      resources: ["bobs_submitted"]
+      actions: ["view", "create", "approve", "delete"]
+    expected:
+      - principal: eve_sales_manager
+        resource: bobs_submitted
+        actions:
+          view: EFFECT_DENY
+          create: EFFECT_ALLOW
+          approve: EFFECT_DENY
+          delete: EFFECT_DENY
+
+  - name: Manager as owner can view and delete own draft but not approve it
+    input:
+      principals: ["carol_manager"]
+      resources: ["carols_draft"]
+      actions: ["view", "approve", "delete"]
+    expected:
+      - principal: carol_manager
+        resource: carols_draft
+        actions:
+          view: EFFECT_ALLOW
+          approve: EFFECT_DENY
+          delete: EFFECT_ALLOW
+
+  - name: Employee cannot approve own submitted expense
+    input:
+      principals: ["bob_employee"]
+      resources: ["bobs_submitted", "bobs_big_submitted"]
+      actions: ["approve"]
+    expected:
+      - principal: bob_employee
+        resource: bobs_submitted
+        actions:
+          approve: EFFECT_DENY
+      - principal: bob_employee
+        resource: bobs_big_submitted
+        actions:
+          approve: EFFECT_DENY

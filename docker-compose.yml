@@ -1,0 +1,10 @@
+services:
+  cerbos:
+    image: ghcr.io/cerbos/cerbos:latest
+    container_name: cerbos-poc
+    ports:
+      - "3592:3592" # HTTP API
+      - "3593:3593" # gRPC API
+    volumes:
+      - ./policies:/policies
+    restart: unless-stopped

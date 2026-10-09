@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="CerbosPoc.AppHost/CerbosPoc.AppHost.csproj" />
+  <Project Path="CerbosPoc.Demo/CerbosPoc.Demo.csproj" />
+  <Project Path="CerbosPoc.ServiceDefaults/CerbosPoc.ServiceDefaults.csproj" />
+</Solution>
