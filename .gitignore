@@ -116,3 +116,40 @@ src/.vs/config/applicationhost.config
 
 # JetBrains Rider's auto generated files
 .idea/
+
+# Node.js dependencies and logs (CerbosPoc.Web, app)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+
+# Angular build output and caches (CerbosPoc.Web)
+dist/
+out-tsc/
+.angular/
+.sass-cache/
+coverage/
+
+# VS Code: keep the shared workspace files, ignore everything else
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+.history/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+# Claude Code per-user settings
+.claude/settings.local.json
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
