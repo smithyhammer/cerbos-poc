@@ -13,6 +13,9 @@ builder.Services.AddSingleton<ICerbosClient>(_ => CerbosClientBuilder.ForTarget(
 builder.Services.AddSingleton<CerbosAuthorizer>();
 builder.Services.AddSingleton<ExpenseStore>();
 builder.Services.AddSingleton<PolicyVersions>();
+builder.Services.AddSingleton<IResourceResolver, ExpenseResolver>();
+builder.Services.AddSingleton<IResourceResolver, AppSectionResolver>();
+builder.Services.AddSingleton<IResourceResolver, PolicyVersionResolver>();
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
@@ -66,6 +69,54 @@ secured.MapPut("/policy-versions/active", async (HttpContext http, CerbosAuthori
 
     versions.Activate(body.Version);
     return Results.Ok(PolicyVersionState(versions));
+});
+
+// Resource kinds the generic verify endpoint understands, and the actions each one supports.
+secured.MapGet("/verify/kinds", (IEnumerable<IResourceResolver> resolvers) =>
+    resolvers.Select(r => new { kind = r.Kind, actions = r.Actions }));
+
+// Generic permission check for any registered resource kind. Callers name resources by kind and id;
+// attributes are loaded server-side by the kind's resolver. One PDP call per kind in the request.
+secured.MapPost("/verify",async (HttpContext http, CerbosAuthorizer cerbos, IEnumerable<IResourceResolver> resolvers, VerifyRequest body) =>
+{
+    var user = CurrentUser(http);
+    var byKind = resolvers.ToDictionary(r => r.Kind);
+
+    if (body.Resources is not { Length: > 0 })
+        return Results.Problem(statusCode: 400, detail: "Send at least one resource to check.");
+
+    if (body.Resources.FirstOrDefault(r => !byKind.ContainsKey(r.Kind)) is { } unknownKind)
+        return Results.Problem(statusCode: 400,
+            detail: $"Unknown resource kind '{unknownKind.Kind}'. Known kinds: {string.Join(", ", byKind.Keys)}.");
+
+    if (body.Resources.FirstOrDefault(r => RequestedActions(r, byKind[r.Kind]).Except(byKind[r.Kind].Actions).Any()) is { } badActions)
+        return Results.Problem(statusCode: 400,
+            detail: $"Kind '{badActions.Kind}' supports only these actions: {string.Join(", ", byKind[badActions.Kind].Actions)}.");
+
+    var results = new List<VerifyResult>();
+    var notFound = new List<VerifyResourceRequest>();
+
+    foreach (var group in body.Resources.GroupBy(r => r.Kind))
+    {
+        var resolver = byKind[group.Key];
+        var found = new List<(VerifyResourceRequest Request, (string Id, Resource Resource) Resource)>();
+        foreach (var request in group)
+        {
+            if (resolver.Resolve(request.Id) is { } resource) found.Add((request, resource));
+            else notFound.Add(request);
+        }
+        if (found.Count == 0) continue;
+
+        var actions = found.SelectMany(f => RequestedActions(f.Request, resolver)).Distinct().ToArray();
+        var decisions = await cerbos.CheckAsync(
+            user, found.Select(f => f.Resource).DistinctBy(r => r.Id), actions, resolver.PolicyVersion);
+
+        results.AddRange(found.Select(f => new VerifyResult(
+            resolver.Kind, f.Request.Id,
+            RequestedActions(f.Request, resolver).ToDictionary(a => a, a => decisions[f.Resource.Id][a]))));
+    }
+
+    return Results.Ok(new { results, notFound });
 });
 
 secured.MapGet("/expenses", async (HttpContext http, CerbosAuthorizer cerbos, ExpenseStore store) =>
@@ -193,6 +244,9 @@ static object PolicyVersionState(PolicyVersions versions) =>
 static Expense NewExpenseFor(DemoUser user, double amount, string status) =>
     new("new", user.Id, user.Department ?? "HQ", amount, status, "");
 
+static string[] RequestedActions(VerifyResourceRequest request, IResourceResolver resolver) =>
+    request.Actions is { Length: > 0 } actions ? actions.Distinct().ToArray() : resolver.Actions;
+
 static IResult Forbidden(DemoUser user, string action, string resource) =>
     Results.Problem(statusCode: 403, title: "Denied by Cerbos",
         detail: $"Cerbos denied '{action}' on '{resource}' for {user.Id} ({user.Role}).");
@@ -216,6 +270,13 @@ static async Task<List<ExpenseView>> VisibleExpenses(CerbosAuthorizer cerbos, Ex
 record CreateExpenseRequest(double Amount, string Description, bool Submit);
 
 record ActivatePolicyVersionRequest(string Version);
+
+// Actions omitted or empty means every action the kind supports.
+record VerifyResourceRequest(string Kind, string Id, string[]? Actions);
+
+record VerifyRequest(VerifyResourceRequest[] Resources);
+
+record VerifyResult(string Kind, string Id, Dictionary<string, bool> AllowedActions);
 
 record ExpenseView(
     string Id, string OwnerId, string Department, double Amount, string Status, string Description,
